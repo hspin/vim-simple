@@ -57,19 +57,19 @@ function! signature#utils#Maps(mode)                                            
   call s:Map(a:mode, 'GotoPrevMarker'   , "[-"                            , 'marker#Goto("prev", "same", v:count)')
   call s:Map(a:mode, 'GotoNextMarkerAny', "]="                            , 'marker#Goto("next", "any",  v:count)')
   call s:Map(a:mode, 'GotoPrevMarkerAny', "[="                            , 'marker#Goto("prev", "any",  v:count)')
-  call s:Map(a:mode, 'ListBufferMarks'  , 'm/'                            , 'mark#List("buf_curr", v:count)'      )
-  call s:Map(a:mode, 'ListBufferMarkers', 'm?'                            , 'marker#List()'                       )
+  call s:Map(a:mode, 'ListBufferMarks'  , 'm/'                            , 'mark#List(0, 0)'                     )
+  call s:Map(a:mode, 'ListBufferMarkers', 'm?'                            , 'marker#List(v:count, 0)'             )
 endfunction
 
 
-function! signature#utils#Input()                                                                                 " {{{2
+function! signature#utils#Input()                                                                                 " {{{1
   " Description: Grab input char
 
   " Obtain input from user ...
   let l:char = nr2char(getchar())
 
   " ... if the input is not a number eg. '!' ==> Delete all '!' markers
-  if stridx(b:SignatureIncludeMarkers, l:char) >= 0
+  if (b:SignatureIncludeMarkers =~# l:char)
     return signature#marker#Purge(l:char)
   endif
 
@@ -78,9 +78,9 @@ function! signature#utils#Input()                                               
     let l:char = split(')!@#$%^&*(', '\zs')[l:char]
   endif
 
-  if stridx(b:SignatureIncludeMarkers, l:char) >= 0
+  if (b:SignatureIncludeMarkers =~# l:char)
     return signature#marker#Toggle(l:char)
-  elseif stridx(b:SignatureIncludeMarks, l:char) >= 0
+  elseif (b:SignatureIncludeMarks =~# l:char)
     return signature#mark#Toggle(l:char)
   else
     " l:char is probably one of `'[]<>
@@ -89,7 +89,7 @@ function! signature#utils#Input()                                               
 endfunction
 
 
-function! signature#utils#Remove(lnum)                                                                            " {{{2
+function! signature#utils#Remove(lnum)                                                                            " {{{1
   " Description: Obtain mark or marker from the user and remove it.
   "              There can be multiple markers of the same type on different lines. If a line no. is provided
   "              (non-zero), delete the marker from the specified line else delete it from the current line
@@ -108,7 +108,7 @@ function! signature#utils#Remove(lnum)                                          
 endfunction
 
 
-function! signature#utils#Toggle()                                                                                " {{{2
+function! signature#utils#Toggle()                                                                                " {{{1
   " Description: Toggles and refreshes sign display in the buffer.
 
   let b:sig_enabled = !b:sig_enabled
@@ -132,4 +132,31 @@ function! signature#utils#Toggle()                                              
     call signature#sign#ToggleDummy()
     unlet b:sig_marks
   endif
+endfunction
+
+
+function! signature#utils#SetupHighlightGroups()                                                                  " {{{1
+  " Description: Sets up the highlight groups
+
+  function! CheckAndSetHL(curr_hl, attr, prefix, from_hl)
+    let l:curr_color = synIDattr(synIDtrans(hlID(a:curr_hl)), a:attr, a:prefix)
+    let l:from_color = synIDattr(synIDtrans(hlID(a:from_hl)), a:attr, a:prefix)
+
+    if (  (  (l:curr_color == "")
+     \    || (l:curr_color  < 0)
+     \    )
+     \ && (l:from_color != "")
+     \ && (l:from_color >= 0)
+     \ )
+      execute 'highlight ' . a:curr_hl . ' ' . a:prefix . a:attr . '=' . l:from_color
+    endif
+  endfunction
+
+  let l:prefix = (has('gui_running') || has('termguicolors') ? 'gui' : 'cterm')
+  call CheckAndSetHL('SignatureMarkText',   'bg', l:prefix, 'SignColumn')
+  call CheckAndSetHL('SignatureMarkText',   'fg', l:prefix, 'Exception' )
+  call CheckAndSetHL('SignatureMarkerText', 'bg', l:prefix, 'SignColumn')
+  call CheckAndSetHL('SignatureMarkerText', 'fg', l:prefix, 'WarningMsg')
+
+  delfunction CheckAndSetHL
 endfunction
